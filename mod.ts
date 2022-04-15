@@ -8,7 +8,7 @@ import {
 } from "https://deno.land/std@0.135.0/fs/mod.ts";
 import { extname } from "https://deno.land/std@0.135.0/path/mod.ts";
 import Duration from "https://deno.land/x/durationjs@v2.3.2/mod.ts";
-import { Database } from "https://deno.land/x/aloedb/mod.ts";
+import { Database } from "https://deno.land/x/aloedb@0.9.0/mod.ts";
 
 const configFile = `${Deno.env.get("HOME")}/.webm-convert.json`;
 

@@ -20,7 +20,7 @@ e.g. `video_name/video_name.webm`
 Using Deno
 
 ```bash
-deno install -f --allow-read --allow-write --allow-run --allow-env --allow-net -n webm-convert http://git.lousando.xyz:8929/lousando/webm-convert/raw/branch/master/mod.ts
+deno install -rf --allow-read --allow-write --allow-run --allow-env --allow-net -n webm-convert http://git.lousando.xyz:8929/lousando/webm-convert/raw/branch/master/mod.ts
 ```
 
 # Config

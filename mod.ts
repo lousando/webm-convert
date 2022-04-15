@@ -21,6 +21,7 @@ interface AppConfig {
 const configDB = new Database<AppConfig>({
   path: configFile,
   pretty: true,
+  optimize: false, // does not batch saves and allows for #save to wait on disk write
 });
 
 const currentConfigFileVersion = 1;
@@ -40,7 +41,10 @@ if (config === null) {
     pushover_token: "",
     pushover_user: "",
   });
-  console.log(`Config saved to ${configFile}`);
+  await configDB.save(); // make sure this is written to disk before continuing
+  console.log(
+    `Config saved to ${configFile}. Restart program for changes to take effect.\n`,
+  );
 }
 
 // todo: check if ffmpeg is installed

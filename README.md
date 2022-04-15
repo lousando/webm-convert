@@ -1,4 +1,4 @@
-# webm-convertazure
+# webm-convert
 
 A wrapper for `ffmpeg` to easily convert most file types to WebM format using the newer VP9 codec.
 
@@ -19,5 +19,5 @@ e.g. `video_name/video_name.webm`
 Using Deno
 
 ```bash
-deno install --allow-read --allow-write --allow-run --allow-env --allow-net -n webm-convert http://git.lousando.xyz:8929/lousando/webm-convert/raw/branch/master/mod.ts
+deno install -f --allow-read --allow-write --allow-run --allow-env --allow-net -n webm-convert http://git.lousando.xyz:8929/lousando/webm-convert/raw/branch/master/mod.ts
 ```

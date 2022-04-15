@@ -23,12 +23,6 @@ const { extname, resolve } = require("path");
 const { DateTime, Duration } = require("luxon");
 const { ensureDirSync, removeSync } = require("fs-extra");
 
-const Push = require("pushover-notifications");
-const pusher = new Push({
-	user: process.env.PUSHOVER_USER,
-	token: process.env.PUSHOVER_TOKEN
-});
-
 glob(args.input, async (error, files) => {
 	let spinner = ora(_prefixTime(`${files.length} will be converted`))
 		.info()
@@ -144,12 +138,6 @@ glob(args.input, async (error, files) => {
 			title: "Webm Convert"
 		};
 
-		pusher.send(message, error => {
-			if (error) {
-				console.error("Could not send Pushover notification.");
-			}
-		});
-
 		spinner
 			.succeed(
 				chalk.green.bgBlack(
@@ -164,12 +152,6 @@ glob(args.input, async (error, files) => {
 		message: `Converted all ${files.length} files.`, // required
 		title: "Webm Convert"
 	};
-
-	pusher.send(message, error => {
-		if (error) {
-			console.error("Could not send Pushover notification.");
-		}
-	});
 
 	spinner.succeed(chalk.blue.bgBlack(_prefixTime("===== All Done =====")));
 });

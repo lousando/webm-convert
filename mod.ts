@@ -7,6 +7,7 @@ import {
   expandGlobSync,
 } from "https://deno.land/std@0.135.0/fs/mod.ts";
 import { extname } from "https://deno.land/std@0.135.0/path/mod.ts";
+import Duration from "https://deno.land/x/durationjs@v2.3.2/mod.ts";
 // load .env
 import "https://deno.land/std@0.135.0/dotenv/load.ts";
 
@@ -76,8 +77,9 @@ for (const file of filesToConvert) {
 
   let conversionDurationInSeconds = 0;
   const conversionInterval = setInterval(() => {
-    spinner.text =
-      `[${conversionDurationInSeconds}s] Converting ${titleName}...`;
+    spinner.text = `[${
+      prettyDuration(conversionDurationInSeconds)
+    }] Converting: ${titleName}...`;
     conversionDurationInSeconds++;
   }, 1000);
 
@@ -185,8 +187,9 @@ for (const file of filesToConvert) {
   spinner.stop(); // stop before clearing interval so spinner doesn't get stuck
   clearInterval(conversionInterval);
 
-  const successMessage =
-    `Done converting: ${titleName} (Took ${conversionDurationInSeconds}s)`;
+  const successMessage = `Done converting: ${titleName} (Took ${
+    prettyDuration(conversionDurationInSeconds)
+  })`;
 
   spinner.succeed(successMessage);
   sendPushoverMessage(successMessage);
@@ -196,6 +199,13 @@ spinner.succeed("Finished conversion.");
 
 // utility functions
 // ===================
+
+function prettyDuration(durationInSeconds = 0) {
+  return new Duration(durationInSeconds * 1000).stringify(
+    ["h", "s", "m"],
+    true,
+  );
+}
 
 function sendPushoverMessage(message = "") {
   if (

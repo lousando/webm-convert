@@ -1,6 +1,7 @@
 # webm-convert
 
-A wrapper for `ffmpeg` to easily convert most file types to WebM format using the newer VP9 codec.
+A wrapper for `ffmpeg` to easily convert most file types to WebM format using
+the newer VP9 codec.
 
 ## Usage
 
@@ -11,7 +12,7 @@ Options:
   -i, --input       glob pattern matching file/s                      [required]
 ```
 
-Note: Files currently output relative to the working in the inside a directory. 
+Note: Files currently output relative to the working in the inside a directory.
 e.g. `video_name/video_name.webm`
 
 # Install

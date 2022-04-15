@@ -99,6 +99,12 @@ if (filesToConvert.length === 0) {
 
 const spinner = wait("Conversion starting in 5 seconds...").start();
 
+Deno.addSignalListener("SIGINT", () => {
+  spinner.clear(); // prevent weird console cursor on exit
+  spinner.info("Conversion interrupted.");
+  Deno.exit(-1);
+});
+
 // wait a bit
 await new Promise((resolve) => setTimeout(resolve, 5000));
 

@@ -22,3 +22,8 @@ Using Deno
 ```bash
 deno install -f --allow-read --allow-write --allow-run --allow-env --allow-net -n webm-convert http://git.lousando.xyz:8929/lousando/webm-convert/raw/branch/master/mod.ts
 ```
+
+# Config
+
+If a config file isn't found at runtime, a new one will be generated at
+`$HOME/.webm-convert.json`

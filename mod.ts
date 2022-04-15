@@ -8,8 +8,40 @@ import {
 } from "https://deno.land/std@0.135.0/fs/mod.ts";
 import { extname } from "https://deno.land/std@0.135.0/path/mod.ts";
 import Duration from "https://deno.land/x/durationjs@v2.3.2/mod.ts";
-// load .env
-import "https://deno.land/std@0.135.0/dotenv/load.ts";
+import { Database } from "https://deno.land/x/aloedb/mod.ts";
+
+const configFile = `${Deno.env.get("HOME")}/.webm-convert.json`;
+
+interface AppConfig {
+  version: number;
+  pushover_token: string;
+  pushover_user: string;
+}
+
+const configDB = new Database<AppConfig>({
+  path: configFile,
+  pretty: true,
+});
+
+const currentConfigFileVersion = 1;
+
+// find the correct config version
+const config = await configDB.findOne({
+  version: currentConfigFileVersion,
+});
+
+// no config, create the initial config
+if (config === null) {
+  console.log(
+    `No version ${currentConfigFileVersion} config found, creating a config...`,
+  );
+  await configDB.insertOne({
+    version: currentConfigFileVersion,
+    pushover_token: "",
+    pushover_user: "",
+  });
+  console.log(`Config saved to ${configFile}`);
+}
 
 // todo: check if ffmpeg is installed
 
@@ -61,13 +93,15 @@ if (filesToConvert.length === 0) {
   Deno.exit(-1);
 }
 
-const spinner = wait("Starting conversion in 5 seconds...").start();
+const spinner = wait("Conversion starting in 5 seconds...").start();
 
 // wait a bit
 await new Promise((resolve) => setTimeout(resolve, 5000));
 
 spinner.clear();
 spinner.info(`${filesToConvert.length} files will be converted.`);
+
+let totalConversionDurationInSeconds = 0;
 
 for (const file of filesToConvert) {
   spinner.start();
@@ -81,6 +115,7 @@ for (const file of filesToConvert) {
       prettyDuration(conversionDurationInSeconds)
     }] Converting: ${titleName}...`;
     conversionDurationInSeconds++;
+    totalConversionDurationInSeconds++;
   }, 1000);
 
   let resolutionOptions: Array<string> = [];
@@ -195,7 +230,12 @@ for (const file of filesToConvert) {
   sendPushoverMessage(successMessage);
 }
 
-spinner.succeed("Finished conversion.");
+const doneMessage = `Finished converting ${filesToConvert.length} files (Took ${
+  prettyDuration(totalConversionDurationInSeconds)
+}).`;
+
+spinner.succeed(doneMessage);
+sendPushoverMessage(doneMessage);
 
 // utility functions
 // ===================
@@ -209,18 +249,18 @@ function prettyDuration(durationInSeconds = 0) {
 
 function sendPushoverMessage(message = "") {
   if (
-    Deno.env.get("PUSHOVER_TOKEN") === undefined ||
-    Deno.env.get("PUSHOVER_USER") === undefined
+    !config?.pushover_token ||
+    !config?.pushover_token
   ) {
     console.info(
-      "PUSHOVER_TOKEN and PUSHOVER_USER environment variables not set.",
+      `"pushover_token" or "pushover_user" is not set in ${configFile}`,
     );
     return;
   }
 
   const pushoverBody = new URLSearchParams();
-  pushoverBody.append("token", Deno.env.get("PUSHOVER_TOKEN") || "");
-  pushoverBody.append("user", Deno.env.get("PUSHOVER_USER") || "");
+  pushoverBody.append("token", config?.pushover_token);
+  pushoverBody.append("user", config?.pushover_user);
   pushoverBody.append("message", message);
 
   fetch("https://api.pushover.net/1/messages.json", {

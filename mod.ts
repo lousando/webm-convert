@@ -2,11 +2,11 @@
 
 import { parse } from "https://deno.land/std@0.135.0/flags/mod.ts";
 import { wait } from "https://deno.land/x/wait@0.1.12/mod.ts";
+import { ensureDir } from "https://deno.land/std@0.135.0/fs/mod.ts";
 import {
-  ensureDir,
-  expandGlobSync,
-} from "https://deno.land/std@0.135.0/fs/mod.ts";
-import { extname } from "https://deno.land/std@0.135.0/path/mod.ts";
+  parse as parsePath,
+  ParsedPath,
+} from "https://deno.land/std@0.135.0/path/mod.ts";
 import Duration from "https://deno.land/x/durationjs@v2.3.2/mod.ts";
 import { Database } from "https://deno.land/x/aloedb@0.9.0/mod.ts";
 
@@ -70,26 +70,33 @@ try {
 }
 
 const args = parse(Deno.args, {
+  stopEarly: true, // populates "_"
   alias: {
     "r": "resolution",
-    "i": "input",
   },
   string: [
     "resolution",
-    "input",
   ],
 });
 
+const filesToConvert: Array<ParsedPath> = args._.map((f) =>
+  parsePath(String(f))
+);
+
 function showHelpAndExit() {
-  console.log(`Options:
+  console.log(
+    `Usage: 
+  webm-convert -r <resolution> <input_file_1> [input_file_2]...
+
+  Options:
       -r, --resolution  the input resolution of the video file/s
                                            [required] [choices: 360, 480, 720, 1080]
-      -i, --input       glob pattern matching file/s                      [required]
-    `);
+    `,
+  );
   Deno.exit(1);
 }
 
-if (!args.input || !args.resolution) {
+if (filesToConvert.length == 0 || !args.resolution) {
   showHelpAndExit();
 }
 
@@ -102,19 +109,6 @@ const resolutionChoices = [
 
 if (!resolutionChoices.includes(args.resolution)) {
   showHelpAndExit();
-}
-
-const filesToConvert = [];
-
-for (const file of expandGlobSync(args.input)) {
-  if (file.isFile) {
-    filesToConvert.push(file);
-  }
-}
-
-if (filesToConvert.length === 0) {
-  console.log(`No files found matching ${args.input}`);
-  Deno.exit(1);
 }
 
 const spinner = wait("Conversion starting in 5 seconds...").start();
@@ -135,7 +129,7 @@ let totalConversionDurationInSeconds = 0;
 
 for (const file of filesToConvert) {
   spinner.start();
-  const titleName = file.name.replace(extname(file.name), "");
+  const titleName = file.name;
 
   await ensureDir(titleName); // make empty dist directory
 
@@ -216,7 +210,7 @@ for (const file of filesToConvert) {
     cmd: [
       "ffmpeg",
       "-i",
-      file.path,
+      file.dir + file.base,
       "-y", // overwrite output files
 
       "-sn", // no subtitles

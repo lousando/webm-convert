@@ -66,7 +66,7 @@ function showHelpAndExit() {
                                            [required] [choices: 360, 480, 720, 1080]
       -i, --input       glob pattern matching file/s                      [required]
     `);
-  Deno.exit(-1);
+  Deno.exit(1);
 }
 
 if (!args.input || !args.resolution) {
@@ -94,7 +94,7 @@ for (const file of expandGlobSync(args.input)) {
 
 if (filesToConvert.length === 0) {
   console.log(`No files found matching ${args.input}`);
-  Deno.exit(-1);
+  Deno.exit(1);
 }
 
 const spinner = wait("Conversion starting in 5 seconds...").start();
@@ -102,7 +102,7 @@ const spinner = wait("Conversion starting in 5 seconds...").start();
 Deno.addSignalListener("SIGINT", () => {
   spinner.clear(); // prevent weird console cursor on exit
   spinner.info("Conversion interrupted.");
-  Deno.exit(-1);
+  Deno.exit(130);
 });
 
 // wait a bit

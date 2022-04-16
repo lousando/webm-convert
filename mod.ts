@@ -127,15 +127,18 @@ spinner.info(`${filesToConvert.length} files will be converted.`);
 
 let totalConversionDurationInSeconds = 0;
 
-for (const file of filesToConvert) {
+for (let i = 0; i < filesToConvert.length; i++) {
   spinner.start();
+
+  const file = filesToConvert[i];
   const titleName = file.name;
+  const prettyFileIndex = i + 1;
 
   await ensureDir(titleName); // make empty dist directory
 
   let conversionDurationInSeconds = 0;
   const conversionInterval = setInterval(() => {
-    spinner.text = `[${
+    spinner.text = `[File ${prettyFileIndex} of ${filesToConvert.length}] [${
       prettyDuration(conversionDurationInSeconds)
     }] Converting: ${titleName}...`;
     conversionDurationInSeconds++;

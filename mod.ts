@@ -47,7 +47,27 @@ if (config === null) {
   );
 }
 
-// todo: check if ffmpeg is installed
+try {
+  // check if ffmpeg is installed
+  const ffmpegCheck = Deno.run({
+    stdout: "null", // ignore this program's output
+    stdin: "null", // ignore this program's input
+    stderr: "null", // ignore this program's input
+    cmd: ["ffmpeg"],
+  });
+
+  await ffmpegCheck.status(); // wait for process to stop
+} catch (error) {
+  if (error instanceof Deno.errors.NotFound) {
+    console.error(
+      `Could not find "ffmpeg". Please install it to use this program.`,
+    );
+  } else {
+    console.error(error);
+  }
+
+  Deno.exit(1);
+}
 
 const args = parse(Deno.args, {
   alias: {

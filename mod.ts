@@ -197,6 +197,23 @@ for (let i = 0; i < filesToConvert.length; i++) {
   }
   // ===============================================
 
+  // create background image
+  await Deno.run({
+    cmd: [
+      "ffmpegthumbnailer",
+
+      // keep original size
+      "-s",
+      "0",
+
+      "-i",
+      file.dir + file.base,
+
+      "-o",
+      `${titleName}/background.jpg`,
+    ],
+  }).status();
+
   // additional options
   // ====================
   // "-fflags +genpts" - add this to regenerate packet timestamps

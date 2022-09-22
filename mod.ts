@@ -223,6 +223,7 @@ for (let i = 0; i < filesToConvert.length; i++) {
   // "-ac 2" - sets 2 audio channels
   // "-an" - no audio
 
+  const outputFileName = `${titleName}/${titleName}.webm`;
   const conversionProcess = Deno.run({
     stdout: "null", // ignore this program's output
     stdin: "null", // ignore this program's input
@@ -257,11 +258,38 @@ for (let i = 0; i < filesToConvert.length; i++) {
       "-lag-in-frames",
       "25",
       ...resolutionOptions,
-      `${titleName}/${titleName}.webm`,
+      outputFileName,
     ],
   });
 
   await conversionProcess.status(); // wait for process to stop
+
+  const integrityCheckProcess = Deno.run({
+    stdout: "piped", // ignore this program's output
+    stdin: "piped", // ignore this program's input
+    stderr: "piped", // ignore this program's input
+    cmd: [
+      "ffmpeg",
+      "-loglevel",
+      "error",
+      "-i",
+      outputFileName,
+      "-f",
+      "null",
+      "-map",
+      "0:1",
+      "-",
+    ],
+  });
+
+  await integrityCheckProcess.status();
+
+  const hasIntegrityError =
+    (await integrityCheckProcess.stderrOutput())?.length > 0;
+
+  if (hasIntegrityError) {
+    console.error(`Found an integrity error in: ${titleName}`);
+  }
 
   spinner.stop(); // stop before clearing interval so spinner doesn't get stuck
   clearInterval(conversionInterval);

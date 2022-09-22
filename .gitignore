@@ -27,6 +27,9 @@ node_modules/
 # only use yarn
 package-lock.json
 
+# binaries
+bin
+
 # sample directories
 sample/
 sample_2/

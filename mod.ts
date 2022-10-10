@@ -134,6 +134,15 @@ for (let i = 0; i < filesToConvert.length; i++) {
   const titleName = file.name;
   const prettyFileIndex = i + 1;
 
+  spinner.text = `Checking integrity of ${file.dir + file.base}`;
+  const inputFileIntegrityError = await hasIntegrityError(file.dir + file.base);
+  if (inputFileIntegrityError) {
+    const errorMessage = `ERROR: Integrity issue with ${file.dir + file.base}`;
+    spinner.fail(errorMessage);
+    await sendPushoverMessage(errorMessage, true);
+    continue;
+  }
+
   await ensureDir(titleName); // make empty dist directory
 
   let conversionDurationInSeconds = 0;
@@ -264,31 +273,13 @@ for (let i = 0; i < filesToConvert.length; i++) {
 
   await conversionProcess.status(); // wait for process to stop
 
-  const integrityCheckProcess = Deno.run({
-    stdout: "piped", // ignore this program's output
-    stdin: "piped", // ignore this program's input
-    stderr: "piped", // ignore this program's input
-    cmd: [
-      "ffmpeg",
-      "-loglevel",
-      "error",
-      "-i",
-      outputFileName,
-      "-f",
-      "null",
-      "-map",
-      "0:1",
-      "-",
-    ],
-  });
-
-  await integrityCheckProcess.status();
-
-  const hasIntegrityError =
-    (await integrityCheckProcess.stderrOutput())?.length > 0;
-
-  if (hasIntegrityError) {
-    console.error(`Found an integrity error in: ${titleName}`);
+  spinner.text = `Checking integrity of ${outputFileName}`;
+  const outputFileIntegrityError = await hasIntegrityError(outputFileName);
+  if (outputFileIntegrityError) {
+    const errorMessage = `ERROR: Integrity issue with ${outputFileName}`;
+    spinner.fail(errorMessage);
+    await sendPushoverMessage(errorMessage, true);
+    continue;
   }
 
   spinner.stop(); // stop before clearing interval so spinner doesn't get stuck
@@ -299,7 +290,7 @@ for (let i = 0; i < filesToConvert.length; i++) {
   })`;
 
   spinner.succeed(successMessage);
-  sendPushoverMessage(successMessage);
+  await sendPushoverMessage(successMessage);
 }
 
 const doneMessage = `Finished converting ${filesToConvert.length} files (Took ${
@@ -307,7 +298,7 @@ const doneMessage = `Finished converting ${filesToConvert.length} files (Took ${
 }).`;
 
 spinner.succeed(doneMessage);
-sendPushoverMessage(doneMessage);
+await sendPushoverMessage(doneMessage);
 
 // utility functions
 // ===================
@@ -319,7 +310,7 @@ function prettyDuration(durationInSeconds = 0) {
   );
 }
 
-function sendPushoverMessage(message = "") {
+async function sendPushoverMessage(message = "", isError = false) {
   if (
     !config?.pushover_token ||
     !config?.pushover_token
@@ -335,11 +326,39 @@ function sendPushoverMessage(message = "") {
   pushoverBody.append("user", config?.pushover_user);
   pushoverBody.append("message", message);
 
-  fetch("https://api.pushover.net/1/messages.json", {
+  if (isError) {
+    pushoverBody.append("sound", "intermission");
+  }
+
+  await fetch("https://api.pushover.net/1/messages.json", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: pushoverBody,
   });
+}
+
+async function hasIntegrityError(fileName: string) {
+  const integrityCheckProcess = Deno.run({
+    stdout: "piped", // ignore this program's output
+    stdin: "piped", // ignore this program's input
+    stderr: "piped", // ignore this program's input
+    cmd: [
+      "ffmpeg",
+      "-loglevel",
+      "error",
+      "-i",
+      fileName,
+      "-f",
+      "null",
+      "-map",
+      "0:1",
+      "-",
+    ],
+  });
+
+  await integrityCheckProcess.status();
+
+  return (await integrityCheckProcess.stderrOutput())?.length > 0;
 }

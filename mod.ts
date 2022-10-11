@@ -86,28 +86,13 @@ const filesToConvert: Array<ParsedPath> = args._.map((f) =>
 function showHelpAndExit() {
   console.log(
     `Usage: 
-  webm-convert -r <resolution> <input_file_1> [input_file_2]...
-
-  Options:
-      -r, --resolution  the input resolution of the video file/s
-                                           [required] [choices: 360, 480, 720, 1080]
+        webm-convert <input_file_1> [input_file_2]...
     `,
   );
   Deno.exit(1);
 }
 
-if (filesToConvert.length == 0 || !args.resolution) {
-  showHelpAndExit();
-}
-
-const resolutionChoices = [
-  "360",
-  "480",
-  "720",
-  "1080",
-];
-
-if (!resolutionChoices.includes(args.resolution)) {
+if (filesToConvert.length == 0) {
   showHelpAndExit();
 }
 
@@ -143,68 +128,42 @@ for (let i = 0; i < filesToConvert.length; i++) {
     continue;
   }
 
+  const videoHeightProcess = Deno.run({
+    stdout: "piped",
+    stdin: "null", // ignore this program's input
+    stderr: "null", // ignore this program's input
+    cmd: [
+      "ffprobe",
+      "-select_streams",
+      "v:0",
+      "-show_entries",
+      "stream=height",
+      "-of",
+      "csv=s=x:p=0",
+      file.dir + file.base,
+    ],
+  });
+
+  await videoHeightProcess.status();
+  const heightResolution = Number(
+    (new TextDecoder()).decode(await videoHeightProcess.output()),
+  );
+
+  const { options: resolutionOptions, matchedResolution } =
+    findResolutionOptions(
+      heightResolution,
+    );
+
   await ensureDir(titleName); // make empty dist directory
 
   let conversionDurationInSeconds = 0;
   const conversionInterval = setInterval(() => {
     spinner.text = `[File ${prettyFileIndex} of ${filesToConvert.length}] [${
       prettyDuration(conversionDurationInSeconds)
-    }] Converting: ${titleName}...`;
+    }] [${matchedResolution}p] Converting: ${titleName}...`;
     conversionDurationInSeconds++;
     totalConversionDurationInSeconds++;
   }, 1000);
-
-  let resolutionOptions: Array<string> = [];
-
-  //  configure resolution
-  // ===============================================
-  switch (args.resolution) {
-    case 360:
-      // 360p - CRF 36 / -tile-columns 1 / -threads 4
-      resolutionOptions = [
-        "-crf",
-        "36",
-        "-tile-columns",
-        "1",
-        "-threads",
-        "4",
-      ];
-      break;
-    case 480:
-      // 480p - CRF 33 / -tile-columns 1 / -threads 4
-      resolutionOptions = [
-        "-crf",
-        "33",
-        "-tile-columns",
-        "1",
-        "-threads",
-        "4",
-      ];
-      break;
-    case 720:
-      // 720p - CRF 32 / -tile-columns 2 / -threads 8
-      resolutionOptions = [
-        "-crf",
-        "32",
-        "-tile-columns",
-        "2",
-        "-threads",
-        "8",
-      ];
-      break;
-    case 1080:
-      // 1080p - CRF 31 / -tile-columns 2 / -threads 8
-      resolutionOptions = [
-        "-crf",
-        "31",
-        "-tile-columns",
-        "2",
-        "-threads",
-        "8",
-      ];
-      break;
-  }
-  // ===============================================
 
   // create background image
   await Deno.run({
@@ -361,4 +320,80 @@ async function hasIntegrityError(fileName: string) {
   await integrityCheckProcess.status();
 
   return (await integrityCheckProcess.stderrOutput())?.length > 0;
+}
+
+function findResolutionOptions(heightResolution: Number): {
+  matchedResolution: Number;
+  options: Array<string>;
+} {
+  //  configure resolution
+  // ===============================================
+  switch (heightResolution) {
+    case 360:
+      // 360p - CRF 36 / -tile-columns 1 / -threads 4
+      return {
+        matchedResolution: 360,
+        options: [
+          "-crf",
+          "36",
+          "-tile-columns",
+          "1",
+          "-threads",
+          "4",
+        ],
+      };
+    case 480:
+      // 480p - CRF 33 / -tile-columns 1 / -threads 4
+      return {
+        matchedResolution: 480,
+        options: [
+          "-crf",
+          "33",
+          "-tile-columns",
+          "1",
+          "-threads",
+          "4",
+        ],
+      };
+    case 720:
+      // 720p - CRF 32 / -tile-columns 2 / -threads 8
+      return {
+        matchedResolution: 720,
+        options: [
+          "-crf",
+          "32",
+          "-tile-columns",
+          "2",
+          "-threads",
+          "8",
+        ],
+      };
+    case 1080:
+      // 1080p - CRF 31 / -tile-columns 2 / -threads 8
+      return {
+        matchedResolution: 1080,
+        options: [
+          "-crf",
+          "31",
+          "-tile-columns",
+          "2",
+          "-threads",
+          "8",
+        ],
+      };
+    default:
+      const availableResolutions = [
+        360,
+        480,
+        720,
+        1080,
+      ];
+      const deltas = [
+        ...availableResolutions,
+      ].map((r) => Math.abs(r - heightResolution));
+      const lowest = Math.min(...deltas);
+      const matchedResolution = availableResolutions[deltas.indexOf(lowest)];
+      return findResolutionOptions(matchedResolution);
+  }
+  // ===============================================
 }

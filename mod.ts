@@ -15,7 +15,7 @@ const configFile = `${Deno.env.get("HOME")}/.webm-convert.json`;
 interface AppConfig {
   version: number;
   pushover_token: string;
-  pushover_user: string;
+  pushover_users: Array<string>;
 }
 
 const configDB = new Database<AppConfig>({
@@ -24,7 +24,7 @@ const configDB = new Database<AppConfig>({
   optimize: false, // does not batch saves and allows for #save to wait on disk write
 });
 
-const currentConfigFileVersion = 1;
+const currentConfigFileVersion = 2;
 
 // find the correct config version
 const config = await configDB.findOne({
@@ -39,7 +39,7 @@ if (config === null) {
   await configDB.insertOne({
     version: currentConfigFileVersion,
     pushover_token: "",
-    pushover_user: "",
+    pushover_user: [""],
   });
   await configDB.save(); // make sure this is written to disk before continuing
   console.log(
@@ -272,30 +272,32 @@ function prettyDuration(durationInSeconds = 0) {
 async function sendPushoverMessage(message = "", isError = false) {
   if (
     !config?.pushover_token ||
-    !config?.pushover_token
+    !config?.pushover_users?.length
   ) {
     console.info(
-      `"pushover_token" or "pushover_user" is not set in ${configFile}`,
+      `"pushover_token" or "pushover_users" is not set in ${configFile}`,
     );
     return;
   }
 
-  const pushoverBody = new URLSearchParams();
-  pushoverBody.append("token", config?.pushover_token);
-  pushoverBody.append("user", config?.pushover_user);
-  pushoverBody.append("message", message);
+  await Promise.all(config.pushover_users.map(async (user) => {
+    const pushoverBody = new URLSearchParams();
+    pushoverBody.append("token", config?.pushover_token);
+    pushoverBody.append("user", user);
+    pushoverBody.append("message", message);
 
-  if (isError) {
-    pushoverBody.append("sound", "intermission");
-  }
+    if (isError) {
+      pushoverBody.append("sound", "intermission");
+    }
 
-  await fetch("https://api.pushover.net/1/messages.json", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: pushoverBody,
-  });
+    await fetch("https://api.pushover.net/1/messages.json", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: pushoverBody,
+    });
+  }));
 }
 
 async function hasIntegrityError(fileName: string) {
@@ -322,8 +324,8 @@ async function hasIntegrityError(fileName: string) {
   return (await integrityCheckProcess.stderrOutput())?.length > 0;
 }
 
-function findResolutionOptions(heightResolution: Number): {
-  matchedResolution: Number;
+function findResolutionOptions(heightResolution: number): {
+  matchedResolution: number;
   options: Array<string>;
 } {
   //  configure resolution
@@ -381,7 +383,7 @@ function findResolutionOptions(heightResolution: Number): {
           "8",
         ],
       };
-    default:
+    default: {
       const availableResolutions = [
         360,
         480,
@@ -394,6 +396,7 @@ function findResolutionOptions(heightResolution: Number): {
       const lowest = Math.min(...deltas);
       const matchedResolution = availableResolutions[deltas.indexOf(lowest)];
       return findResolutionOptions(matchedResolution);
+    }
   }
   // ===============================================
 }

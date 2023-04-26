@@ -7,11 +7,7 @@ the newer VP9 codec.
 
 ```bash
 Usage: 
-webm-convert -r <resolution> <input_file_1> [input_file_2]...
-
-Options:
-  -r, --resolution  the input resolution of the video file/s
-                                       [required] [choices: 360, 480, 720, 1080]
+webm-convert <input_file_1> [input_file_2]...
 ```
 
 Note: Files currently output relative to the working in the inside a directory.
@@ -22,7 +18,7 @@ e.g. `video_name/video_name.webm`
 Using Deno
 
 ```bash
-deno install -rf --allow-read --allow-write --allow-run --allow-env --allow-net -n webm-convert http://git.lousando.xyz:8929/lousando/webm-convert/raw/branch/master/mod.ts
+deno install -rf --allow-read --allow-write --allow-run --allow-env --allow-net -n webm-convert https://git.lousando.xyz/lousando/webm-convert/raw/branch/master/mod.ts
 ```
 
 # Config

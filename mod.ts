@@ -39,7 +39,7 @@ if (config === null) {
   await configDB.insertOne({
     version: currentConfigFileVersion,
     pushover_token: "",
-    pushover_user: [""],
+    pushover_users: [""],
   });
   await configDB.save(); // make sure this is written to disk before continuing
   console.log(

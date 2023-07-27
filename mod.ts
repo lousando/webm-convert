@@ -1,12 +1,12 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write --allow-run --allow-env --allow-net
 
-import { parse } from "https://deno.land/std@0.135.0/flags/mod.ts";
+import { parse as parseFlags } from "https://deno.land/std@0.196.0/flags/mod.ts";
 import { wait } from "https://deno.land/x/wait@0.1.12/mod.ts";
-import { ensureDir } from "https://deno.land/std@0.135.0/fs/mod.ts";
+import { ensureDir } from "https://deno.land/std@0.196.0/fs/mod.ts";
 import {
   parse as parsePath,
   ParsedPath,
-} from "https://deno.land/std@0.135.0/path/mod.ts";
+} from "https://deno.land/std@0.196.0/path/mod.ts";
 import Duration from "https://deno.land/x/durationjs@v2.3.2/mod.ts";
 import { Database } from "https://deno.land/x/aloedb@0.9.0/mod.ts";
 
@@ -69,15 +69,17 @@ try {
   Deno.exit(1);
 }
 
-const args = parse(Deno.args, {
+const args = parseFlags(Deno.args, {
   stopEarly: true, // populates "_"
-  alias: {
-    "r": "resolution",
+  default: {
+    "no-convert": false,
   },
-  string: [
-    "resolution",
+  boolean: [
+    "no-convert",
   ],
 });
+
+const noConvert = args["no-convert"];
 
 const filesToConvert: Array<ParsedPath> = args._.map((f) =>
   parsePath(String(f))
@@ -108,7 +110,11 @@ Deno.addSignalListener("SIGINT", () => {
 await new Promise((resolve) => setTimeout(resolve, 5000));
 
 spinner.clear();
-spinner.info(`${filesToConvert.length} files will be converted.`);
+spinner.info(
+  `${filesToConvert.length} files will ${
+    noConvert ? "NOT be" : "be"
+  } converted.`,
+);
 
 let totalConversionDurationInSeconds = 0;
 
@@ -116,16 +122,20 @@ for (let i = 0; i < filesToConvert.length; i++) {
   spinner.start();
 
   const file = filesToConvert[i];
+  const ogFileName = file.dir + file.base;
   const titleName = file.name;
   const prettyFileIndex = i + 1;
 
-  spinner.text = `Checking integrity of ${file.dir + file.base}`;
-  const inputFileIntegrityError = await hasIntegrityError(file.dir + file.base);
-  if (inputFileIntegrityError) {
-    const errorMessage = `ERROR: Integrity issue with ${file.dir + file.base}`;
-    spinner.fail(errorMessage);
-    await sendPushoverMessage(errorMessage, true);
-    continue;
+  if (!noConvert) {
+    spinner.text = `Checking integrity of ${ogFileName}`;
+
+    const inputFileIntegrityError = await hasIntegrityError(ogFileName);
+    if (inputFileIntegrityError) {
+      const errorMessage = `ERROR: Integrity issue with ${ogFileName}`;
+      spinner.fail(errorMessage);
+      await sendPushoverMessage(errorMessage, true);
+      continue;
+    }
   }
 
   const videoHeightProcess = Deno.run({
@@ -140,7 +150,7 @@ for (let i = 0; i < filesToConvert.length; i++) {
       "stream=height",
       "-of",
       "csv=s=x:p=0",
-      file.dir + file.base,
+      ogFileName,
     ],
   });
 
@@ -175,7 +185,7 @@ for (let i = 0; i < filesToConvert.length; i++) {
       "0",
 
       "-i",
-      file.dir + file.base,
+      ogFileName,
 
       "-o",
       `${titleName}/background.jpg`,
@@ -192,53 +202,58 @@ for (let i = 0; i < filesToConvert.length; i++) {
   // "-an" - no audio
 
   const outputFileName = `${titleName}/${titleName}.webm`;
-  const conversionProcess = Deno.run({
-    stdout: "null", // ignore this program's output
-    stdin: "null", // ignore this program's input
-    stderr: "null", // ignore this program's input
-    cmd: [
-      "ffmpeg",
-      "-i",
-      file.dir + file.base,
-      "-y", // overwrite output files
 
-      "-sn", // no subtitles
+  if (noConvert) {
+    await Deno.rename(ogFileName, `${titleName}/${ogFileName}`);
+  } else {
+    const conversionProcess = Deno.run({
+      stdout: "null", // ignore this program's output
+      stdin: "null", // ignore this program's input
+      stderr: "null", // ignore this program's input
+      cmd: [
+        "ffmpeg",
+        "-i",
+        ogFileName,
+        "-y", // overwrite output files
 
-      // copy all streams
-      "-map",
-      "0",
+        "-sn", // no subtitles
 
-      "-ac",
-      "8",
+        // copy all streams
+        "-map",
+        "0",
 
-      "-b:v",
-      "0",
+        "-ac",
+        "8",
 
-      "-speed",
-      "4",
+        "-b:v",
+        "0",
 
-      "-frame-parallel",
-      "1",
+        "-speed",
+        "4",
 
-      "-auto-alt-ref",
-      "1",
+        "-frame-parallel",
+        "1",
 
-      "-lag-in-frames",
-      "25",
-      ...resolutionOptions,
-      outputFileName,
-    ],
-  });
+        "-auto-alt-ref",
+        "1",
 
-  await conversionProcess.status(); // wait for process to stop
+        "-lag-in-frames",
+        "25",
+        ...resolutionOptions,
+        outputFileName,
+      ],
+    });
 
-  spinner.text = `Checking integrity of ${outputFileName}`;
-  const outputFileIntegrityError = await hasIntegrityError(outputFileName);
-  if (outputFileIntegrityError) {
-    const errorMessage = `ERROR: Integrity issue with ${outputFileName}`;
-    spinner.fail(errorMessage);
-    await sendPushoverMessage(errorMessage, true);
-    continue;
+    await conversionProcess.status(); // wait for process to stop
+
+    spinner.text = `Checking integrity of ${outputFileName}`;
+    const outputFileIntegrityError = await hasIntegrityError(outputFileName);
+    if (outputFileIntegrityError) {
+      const errorMessage = `ERROR: Integrity issue with ${outputFileName}`;
+      spinner.fail(errorMessage);
+      await sendPushoverMessage(errorMessage, true);
+      continue;
+    }
   }
 
   spinner.stop(); // stop before clearing interval so spinner doesn't get stuck
@@ -249,7 +264,8 @@ for (let i = 0; i < filesToConvert.length; i++) {
   })`;
 
   spinner.succeed(successMessage);
-  await sendPushoverMessage(successMessage);
+
+  !noConvert && await sendPushoverMessage(successMessage);
 }
 
 const doneMessage = `Finished converting ${filesToConvert.length} files (Took ${
@@ -257,7 +273,7 @@ const doneMessage = `Finished converting ${filesToConvert.length} files (Took ${
 }).`;
 
 spinner.succeed(doneMessage);
-await sendPushoverMessage(doneMessage);
+!noConvert && await sendPushoverMessage(doneMessage);
 
 // utility functions
 // ===================

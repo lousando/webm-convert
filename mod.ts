@@ -205,6 +205,12 @@ for (let i = 0; i < filesToConvert.length; i++) {
 
   if (noConvert) {
     await Deno.rename(ogFileName, `${titleName}/${ogFileName}`);
+
+    try {
+      await Deno.rename(`${titleName}.eng.vtt`, `${titleName}/${ogFileName}`);
+    } catch (_error) {
+      // todo: handle error
+    }
   } else {
     const conversionProcess = Deno.run({
       stdout: "null", // ignore this program's output

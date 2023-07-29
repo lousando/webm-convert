@@ -207,7 +207,10 @@ for (let i = 0; i < filesToConvert.length; i++) {
     await Deno.rename(ogFileName, `${titleName}/${ogFileName}`);
 
     try {
-      await Deno.rename(`${titleName}.eng.vtt`, `${titleName}/${ogFileName}`);
+      await Deno.rename(
+        `${titleName}.eng.vtt`,
+        `${titleName}/${titleName}.eng.vtt`,
+      );
     } catch (_error) {
       // todo: handle error
     }

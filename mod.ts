@@ -7,6 +7,7 @@ import {
   parse as parsePath,
   ParsedPath,
 } from "https://deno.land/std@0.196.0/path/mod.ts";
+import { SEP } from "https://deno.land/std@0.196.0/path/separator.ts";
 import Duration from "https://deno.land/x/durationjs@v2.3.2/mod.ts";
 import { Database } from "https://deno.land/x/aloedb@0.9.0/mod.ts";
 
@@ -122,7 +123,7 @@ for (let i = 0; i < filesToConvert.length; i++) {
   spinner.start();
 
   const file = filesToConvert[i];
-  const ogFileName = file.dir + file.base;
+  const ogFileName = `${file.dir}${SEP}${file.base}`;
   const titleName = file.name;
   const prettyFileIndex = i + 1;
 
@@ -164,7 +165,7 @@ for (let i = 0; i < filesToConvert.length; i++) {
       heightResolution,
     );
 
-  await ensureDir(titleName); // make empty dist directory
+  await ensureDir(`${file.dir}${SEP}${titleName}`); // make empty dist directory
 
   let conversionDurationInSeconds = 0;
   const conversionInterval = setInterval(() => {

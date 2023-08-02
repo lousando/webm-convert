@@ -189,7 +189,7 @@ for (let i = 0; i < filesToConvert.length; i++) {
       ogFileName,
 
       "-o",
-      `${titleName}/background.jpg`,
+      `${file.dir}${SEP}${titleName}/background.jpg`,
     ],
   }).status();
 
@@ -202,15 +202,18 @@ for (let i = 0; i < filesToConvert.length; i++) {
   // "-ac 2" - sets 2 audio channels
   // "-an" - no audio
 
-  const outputFileName = `${titleName}/${titleName}.webm`;
+  const outputFileName = `${file.dir}${SEP}${titleName}/${titleName}.webm`;
 
   if (noConvert) {
-    await Deno.rename(ogFileName, `${titleName}/${ogFileName}`);
+    await Deno.rename(
+      ogFileName,
+      `${file.dir}${SEP}${titleName}${SEP}${file.base}`,
+    );
 
     try {
       await Deno.rename(
-        `${titleName}.eng.vtt`,
-        `${titleName}/${titleName}.eng.vtt`,
+        `${file.dir}${SEP}${titleName}.eng.vtt`,
+        `${file.dir}${SEP}${titleName}${SEP}${titleName}.eng.vtt`,
       );
     } catch (_error) {
       // todo: handle error

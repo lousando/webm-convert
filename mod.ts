@@ -127,6 +127,13 @@ for (let i = 0; i < filesToConvert.length; i++) {
   const titleName = file.name;
   const prettyFileIndex = i + 1;
 
+  const fileInfo = await Deno.stat(ogFileName);
+
+  if (fileInfo.isDirectory) {
+    // skip this
+    continue;
+  }
+
   if (!noConvert) {
     spinner.text = `Checking integrity of ${ogFileName}`;
 
@@ -210,10 +217,21 @@ for (let i = 0; i < filesToConvert.length; i++) {
       `${file.dir}${SEP}${titleName}${SEP}${file.base}`,
     );
 
+    // 3 letter code format
     try {
       await Deno.rename(
         `${file.dir}${SEP}${titleName}.eng.vtt`,
         `${file.dir}${SEP}${titleName}${SEP}${titleName}.eng.vtt`,
+      );
+    } catch (_error) {
+      // todo: handle error
+    }
+
+    // 2 letter code format
+    try {
+      await Deno.rename(
+        `${file.dir}${SEP}${titleName}.en.vtt`,
+        `${file.dir}${SEP}${titleName}${SEP}${titleName}.en.vtt`,
       );
     } catch (_error) {
       // todo: handle error

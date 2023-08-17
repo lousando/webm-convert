@@ -123,7 +123,9 @@ for (let i = 0; i < filesToConvert.length; i++) {
   spinner.start();
 
   const file = filesToConvert[i];
-  const ogFileName = `${file.dir}${SEP}${file.base}`;
+  const ogFileName = file.dir === ""
+    ? file.base
+    : `${file.dir}${SEP}${file.base}`;
   const titleName = file.name;
   const prettyFileIndex = i + 1;
 

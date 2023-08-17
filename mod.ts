@@ -249,6 +249,10 @@ for (let i = 0; i < filesToConvert.length; i++) {
 
         "-sn", // no subtitles
 
+        // no title
+        "-metadata",
+        "title=",
+
         // copy all streams
         "-map",
         "0",

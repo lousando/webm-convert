@@ -174,7 +174,11 @@ for (let i = 0; i < filesToConvert.length; i++) {
       heightResolution,
     );
 
-  await ensureDir(`${file.dir}${SEP}${titleName}`); // make empty dist directory
+  if (file.dir !== "") {
+    await ensureDir(`${file.dir}${SEP}${titleName}`); // make empty dist directory
+  } else {
+    await ensureDir(`${titleName}`); // make empty dist directory
+  }
 
   let conversionDurationInSeconds = 0;
   const conversionInterval = setInterval(() => {

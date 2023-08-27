@@ -2,7 +2,6 @@
 
 import { parse as parseFlags } from "https://deno.land/std@0.196.0/flags/mod.ts";
 import { wait } from "https://deno.land/x/wait@0.1.12/mod.ts";
-import { ensureDir } from "https://deno.land/std@0.196.0/fs/mod.ts";
 import {
   parse as parsePath,
   ParsedPath,
@@ -50,14 +49,7 @@ if (config === null) {
 
 try {
   // check if ffmpeg is installed
-  const ffmpegCheck = Deno.run({
-    stdout: "null", // ignore this program's output
-    stdin: "null", // ignore this program's input
-    stderr: "null", // ignore this program's input
-    cmd: ["ffmpeg"],
-  });
-
-  await ffmpegCheck.status(); // wait for process to stop
+  await new Deno.Command("ffmpeg").output();
 } catch (error) {
   if (error instanceof Deno.errors.NotFound) {
     console.error(
@@ -72,15 +64,7 @@ try {
 
 const args = parseFlags(Deno.args, {
   stopEarly: true, // populates "_"
-  default: {
-    "no-convert": false,
-  },
-  boolean: [
-    "no-convert",
-  ],
 });
-
-const noConvert = args["no-convert"];
 
 const filesToConvert: Array<ParsedPath> = args._.map((f) =>
   parsePath(String(f))
@@ -112,9 +96,7 @@ await new Promise((resolve) => setTimeout(resolve, 5000));
 
 spinner.clear();
 spinner.info(
-  `${filesToConvert.length} files will ${
-    noConvert ? "NOT be" : "be"
-  } converted.`,
+  `${filesToConvert.length} files will be converted.`,
 );
 
 let totalConversionDurationInSeconds = 0;
@@ -124,7 +106,7 @@ for (let i = 0; i < filesToConvert.length; i++) {
 
   const file = filesToConvert[i];
   const ogFileName = file.dir === ""
-    ? file.base
+    ? `./${file.base}`
     : `${file.dir}${SEP}${file.base}`;
   const titleName = file.name;
   const prettyFileIndex = i + 1;
@@ -136,24 +118,18 @@ for (let i = 0; i < filesToConvert.length; i++) {
     continue;
   }
 
-  if (!noConvert) {
-    spinner.text = `Checking integrity of ${ogFileName}`;
+  spinner.text = `Checking integrity of ${ogFileName}`;
 
-    const inputFileIntegrityError = await hasIntegrityError(ogFileName);
-    if (inputFileIntegrityError) {
-      const errorMessage = `ERROR: Integrity issue with ${ogFileName}`;
-      spinner.fail(errorMessage);
-      await sendPushoverMessage(errorMessage, true);
-      continue;
-    }
+  const inputFileIntegrityError = await hasIntegrityError(ogFileName);
+  if (inputFileIntegrityError) {
+    const errorMessage = `ERROR: Integrity issue with ${ogFileName}`;
+    spinner.fail(errorMessage);
+    await sendPushoverMessage(errorMessage, true);
+    continue;
   }
 
-  const videoHeightProcess = Deno.run({
-    stdout: "piped",
-    stdin: "null", // ignore this program's input
-    stderr: "null", // ignore this program's input
-    cmd: [
-      "ffprobe",
+  const videoHeightProcess = await new Deno.Command("ffprobe", {
+    args: [
       "-select_streams",
       "v:0",
       "-show_entries",
@@ -162,23 +138,24 @@ for (let i = 0; i < filesToConvert.length; i++) {
       "csv=s=x:p=0",
       ogFileName,
     ],
-  });
+  }).output();
 
-  await videoHeightProcess.status();
+  if (videoHeightProcess.code !== 0) {
+    console.error(
+      `%cFailed to get video height for ${ogFileName}`,
+      "color: red",
+    );
+    Deno.exit(videoHeightProcess.code);
+  }
+
   const heightResolution = Number(
-    (new TextDecoder()).decode(await videoHeightProcess.output()),
+    (new TextDecoder()).decode(videoHeightProcess.stdout),
   );
 
   const { options: resolutionOptions, matchedResolution } =
     findResolutionOptions(
       heightResolution,
     );
-
-  if (file.dir !== "") {
-    await ensureDir(`${file.dir}${SEP}${titleName}`); // make empty dist directory
-  } else {
-    await ensureDir(`${titleName}`); // make empty dist directory
-  }
 
   let conversionDurationInSeconds = 0;
   const conversionInterval = setInterval(() => {
@@ -189,23 +166,6 @@ for (let i = 0; i < filesToConvert.length; i++) {
     totalConversionDurationInSeconds++;
   }, 1000);
 
-  // create background image
-  await Deno.run({
-    cmd: [
-      "ffmpegthumbnailer",
-
-      // keep original size
-      "-s",
-      "0",
-
-      "-i",
-      ogFileName,
-
-      "-o",
-      `${file.dir}${SEP}${titleName}/background.jpg`,
-    ],
-  }).status();
-
   // additional options
   // ====================
   // "-fflags +genpts" - add this to regenerate packet timestamps
@@ -215,86 +175,60 @@ for (let i = 0; i < filesToConvert.length; i++) {
   // "-ac 2" - sets 2 audio channels
   // "-an" - no audio
 
-  const outputFileName = `${file.dir}${SEP}${titleName}/${titleName}.webm`;
+  const outputFileName = `${titleName}.webm`;
 
-  if (noConvert) {
-    await Deno.rename(
+  const conversionProcess = await new Deno.Command("ffmpeg", {
+    args: [
+      "-i",
       ogFileName,
-      `${file.dir}${SEP}${titleName}${SEP}${file.base}`,
-    );
+      "-y", // overwrite output files
 
-    // 3 letter code format
-    try {
-      await Deno.rename(
-        `${file.dir}${SEP}${titleName}.eng.vtt`,
-        `${file.dir}${SEP}${titleName}${SEP}${titleName}.eng.vtt`,
-      );
-    } catch (_error) {
-      // todo: handle error
-    }
+      "-sn", // no subtitles
 
-    // 2 letter code format
-    try {
-      await Deno.rename(
-        `${file.dir}${SEP}${titleName}.en.vtt`,
-        `${file.dir}${SEP}${titleName}${SEP}${titleName}.en.vtt`,
-      );
-    } catch (_error) {
-      // todo: handle error
-    }
-  } else {
-    const conversionProcess = Deno.run({
-      stdout: "null", // ignore this program's output
-      stdin: "null", // ignore this program's input
-      stderr: "null", // ignore this program's input
-      cmd: [
-        "ffmpeg",
-        "-i",
-        ogFileName,
-        "-y", // overwrite output files
+      // no title
+      "-metadata",
+      "title=",
 
-        "-sn", // no subtitles
+      // copy all streams
+      "-map",
+      "0",
 
-        // no title
-        "-metadata",
-        "title=",
+      "-ac",
+      "8",
 
-        // copy all streams
-        "-map",
-        "0",
+      "-b:v",
+      "0",
 
-        "-ac",
-        "8",
+      "-speed",
+      "4",
 
-        "-b:v",
-        "0",
+      "-frame-parallel",
+      "1",
 
-        "-speed",
-        "4",
+      "-auto-alt-ref",
+      "1",
 
-        "-frame-parallel",
-        "1",
+      "-lag-in-frames",
+      "25",
+      ...resolutionOptions,
+      outputFileName,
+    ],
+  }).output();
 
-        "-auto-alt-ref",
-        "1",
+  if (conversionProcess.code !== 0) {
+    const errorMessage = `ERROR: Failed to convert ${outputFileName}`;
+    spinner.fail(errorMessage);
+    await sendPushoverMessage(errorMessage, true);
+    continue;
+  }
 
-        "-lag-in-frames",
-        "25",
-        ...resolutionOptions,
-        outputFileName,
-      ],
-    });
-
-    await conversionProcess.status(); // wait for process to stop
-
-    spinner.text = `Checking integrity of ${outputFileName}`;
-    const outputFileIntegrityError = await hasIntegrityError(outputFileName);
-    if (outputFileIntegrityError) {
-      const errorMessage = `ERROR: Integrity issue with ${outputFileName}`;
-      spinner.fail(errorMessage);
-      await sendPushoverMessage(errorMessage, true);
-      continue;
-    }
+  spinner.text = `Checking integrity of ${outputFileName}`;
+  const outputFileIntegrityError = await hasIntegrityError(outputFileName);
+  if (outputFileIntegrityError) {
+    const errorMessage = `ERROR: Integrity issue with ${outputFileName}`;
+    spinner.fail(errorMessage);
+    await sendPushoverMessage(errorMessage, true);
+    continue;
   }
 
   spinner.stop(); // stop before clearing interval so spinner doesn't get stuck
@@ -306,7 +240,7 @@ for (let i = 0; i < filesToConvert.length; i++) {
 
   spinner.succeed(successMessage);
 
-  !noConvert && await sendPushoverMessage(successMessage);
+  await sendPushoverMessage(successMessage);
 }
 
 const doneMessage = `Finished converting ${filesToConvert.length} files (Took ${
@@ -314,7 +248,7 @@ const doneMessage = `Finished converting ${filesToConvert.length} files (Took ${
 }).`;
 
 spinner.succeed(doneMessage);
-!noConvert && await sendPushoverMessage(doneMessage);
+await sendPushoverMessage(doneMessage);
 
 // utility functions
 // ===================
@@ -358,12 +292,8 @@ async function sendPushoverMessage(message = "", isError = false) {
 }
 
 async function hasIntegrityError(fileName: string) {
-  const integrityCheckProcess = Deno.run({
-    stdout: "piped", // ignore this program's output
-    stdin: "piped", // ignore this program's input
-    stderr: "piped", // ignore this program's input
-    cmd: [
-      "ffmpeg",
+  const integrityCheckProcess = await new Deno.Command("ffmpeg", {
+    args: [
       "-loglevel",
       "error",
       "-i",
@@ -374,11 +304,9 @@ async function hasIntegrityError(fileName: string) {
       "0:1",
       "-",
     ],
-  });
+  }).output();
 
-  await integrityCheckProcess.status();
-
-  return (await integrityCheckProcess.stderrOutput())?.length > 0;
+  return (new TextDecoder().decode(integrityCheckProcess.stderr))?.length > 0;
 }
 
 function findResolutionOptions(heightResolution: number): {

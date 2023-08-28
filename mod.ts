@@ -1,14 +1,12 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write --allow-run --allow-env --allow-net
 
-import { parse as parseFlags } from "https://deno.land/std@0.196.0/flags/mod.ts";
-import { wait } from "https://deno.land/x/wait@0.1.12/mod.ts";
-import {
-  parse as parsePath,
-  ParsedPath,
-} from "https://deno.land/std@0.196.0/path/mod.ts";
-import { SEP } from "https://deno.land/std@0.196.0/path/separator.ts";
-import Duration from "https://deno.land/x/durationjs@v2.3.2/mod.ts";
-import { Database } from "https://deno.land/x/aloedb@0.9.0/mod.ts";
+import { parse as parseFlags } from "std/flags/mod.ts";
+import { wait } from "wait";
+import { ensureDir } from "std/fs/mod.ts";
+import { parse as parsePath, ParsedPath } from "std/path/mod.ts";
+import { SEP } from "std/path/separator.ts";
+import Duration from "durationjs";
+import { Database } from "aloedb";
 
 const configFile = `${Deno.env.get("HOME")}/.webm-convert.json`;
 
@@ -99,6 +97,10 @@ spinner.info(
   `${filesToConvert.length} files will be converted.`,
 );
 
+const outputDirectory = "Converted";
+
+await ensureDir(`${outputDirectory}`); // make empty dist directory
+
 let totalConversionDurationInSeconds = 0;
 
 for (let i = 0; i < filesToConvert.length; i++) {
@@ -175,7 +177,7 @@ for (let i = 0; i < filesToConvert.length; i++) {
   // "-ac 2" - sets 2 audio channels
   // "-an" - no audio
 
-  const outputFileName = `${titleName}.webm`;
+  const outputFileName = `./${outputDirectory}${SEP}${titleName}.webm`;
 
   const conversionProcess = await new Deno.Command("ffmpeg", {
     args: [

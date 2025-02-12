@@ -150,9 +150,8 @@ for (let i = 0; i < filesToConvert.length; i++) {
     Deno.exit(videoHeightProcess.code);
   }
 
-  const heightResolution = Number(
-    (new TextDecoder()).decode(videoHeightProcess.stdout),
-  );
+  const heightResolutionString = (new TextDecoder()).decode(videoHeightProcess.stdout).replace(/\D/ig, '');
+  const heightResolution = Number(heightResolutionString);
 
   const { options: resolutionOptions, matchedResolution } =
     findResolutionOptions(

@@ -18,7 +18,8 @@ e.g. `video_name/video_name.webm`
 Using Deno
 
 ```bash
-deno install -rf --allow-read --allow-write --allow-run --allow-env --allow-net -n webm-convert https://git.lousando.xyz/lousando/webm-convert/raw/branch/master/mod.ts
+# clone the repo, and then...
+make install
 ```
 
 # Config

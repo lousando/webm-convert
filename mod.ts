@@ -1,5 +1,6 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write --allow-run --allow-env --allow-net
+#!/usr/bin/env -S deno run --allow-read --allow-write --allow-run --allow-env --allow-net --allow-sys
 
+import "zx/globals";
 import { parse as parseFlags } from "std/flags/mod.ts";
 import { wait } from "wait";
 import { ensureDir } from "std/fs/mod.ts";
@@ -47,7 +48,7 @@ if (config === null) {
 
 try {
   // check if ffmpeg is installed
-  await new Deno.Command("ffmpeg").output();
+  await $`ffmpeg -hide_banner -version`;
 } catch (error) {
   if (error instanceof Deno.errors.NotFound) {
     console.error(
@@ -130,27 +131,19 @@ for (let i = 0; i < filesToConvert.length; i++) {
     continue;
   }
 
-  const videoHeightProcess = await new Deno.Command("ffprobe", {
-    args: [
-      "-select_streams",
-      "v:0",
-      "-show_entries",
-      "stream=height",
-      "-of",
-      "csv=s=x:p=0",
-      ogFileName,
-    ],
-  }).output();
+  const videoHeightProcess =
+    await $`ffprobe -select_streams v:0 -show_entries stream=height -of csv=s=x:p=0 ${ogFileName}`
+      .quiet();
 
-  if (videoHeightProcess.code !== 0) {
+  if (videoHeightProcess.exitCode !== 0) {
     console.error(
       `%cFailed to get video height for ${ogFileName}`,
       "color: red",
     );
-    Deno.exit(videoHeightProcess.code);
+    Deno.exit(videoHeightProcess.exitCode || 1);
   }
 
-  const heightResolutionString = (new TextDecoder()).decode(videoHeightProcess.stdout).replace(/\D/ig, '');
+  const heightResolutionString = videoHeightProcess.stdout.replace(/\D/ig, "");
   const heightResolution = Number(heightResolutionString);
 
   const { options: resolutionOptions, matchedResolution } =
@@ -178,45 +171,45 @@ for (let i = 0; i < filesToConvert.length; i++) {
 
   const outputFileName = `./${outputDirectory}${SEP}${titleName}.webm`;
 
-  const conversionProcess = await new Deno.Command("ffmpeg", {
-    args: [
-      "-i",
-      ogFileName,
-      "-y", // overwrite output files
+  const conversionFlags = [
+    "-y", // overwrite output files
 
-      "-sn", // no subtitles
+    "-sn", // no subtitles
 
-      // no title
-      "-metadata",
-      "title=",
+    // no title
+    "-metadata",
+    "title=",
 
-      // copy all streams
-      "-map",
-      "0",
+    // copy all streams
+    "-map",
+    "0",
 
-      "-ac",
-      "8",
+    "-ac",
+    "8",
 
-      "-b:v",
-      "0",
+    "-b:v",
+    "0",
 
-      "-speed",
-      "4",
+    "-speed",
+    "4",
 
-      "-frame-parallel",
-      "1",
+    "-frame-parallel",
+    "1",
 
-      "-auto-alt-ref",
-      "1",
+    "-auto-alt-ref",
+    "1",
 
-      "-lag-in-frames",
-      "25",
-      ...resolutionOptions,
-      outputFileName,
-    ],
-  }).output();
+    "-lag-in-frames",
+    "25",
 
-  if (conversionProcess.code !== 0) {
+    ...resolutionOptions,
+  ];
+
+  const conversionProcess =
+    await $`ffmpeg -hide_banner -loglevel error -i ${ogFileName} ${conversionFlags} ${outputFileName}`
+      .quiet();
+
+  if (conversionProcess.exitCode !== 0) {
     const errorMessage = `ERROR: Failed to convert ${outputFileName}`;
     spinner.fail(errorMessage);
     await sendPushoverMessage(errorMessage, true);
@@ -293,21 +286,10 @@ async function sendPushoverMessage(message = "", isError = false) {
 }
 
 async function hasIntegrityError(fileName: string) {
-  const integrityCheckProcess = await new Deno.Command("ffmpeg", {
-    args: [
-      "-loglevel",
-      "error",
-      "-i",
-      fileName,
-      "-f",
-      "null",
-      "-map",
-      "0:1",
-      "-",
-    ],
-  }).output();
+  const integrityCheckProcess =
+    await $`ffmpeg -hide_banner -loglevel error -i ${fileName} -f null -map 0:1 -`;
 
-  return (new TextDecoder().decode(integrityCheckProcess.stderr))?.length > 0;
+  return integrityCheckProcess.stderr?.length > 0;
 }
 
 function findResolutionOptions(heightResolution: number): {
